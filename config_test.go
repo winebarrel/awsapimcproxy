@@ -56,6 +56,21 @@ func TestLoadConfigDefaultCommand(t *testing.T) {
 	assert.Equal(t, DefaultCommand, config.Command)
 }
 
+func TestDefaultCommandNotAliased(t *testing.T) {
+	c1, err := LoadConfig(writeConfig(t, "profiles:\n  - name: a\n"))
+	require.NoError(t, err)
+
+	// Mutating one config's defaulted command must not affect the global default
+	// or any other config.
+	c1.Command[0] = "mutated"
+
+	assert.Equal(t, "uvx", DefaultCommand[0], "DefaultCommand must not be aliased")
+
+	c2, err := LoadConfig(writeConfig(t, "profiles:\n  - name: b\n"))
+	require.NoError(t, err)
+	assert.Equal(t, "uvx", c2.Command[0], "a second config must get a fresh default command")
+}
+
 func TestLoadConfigFileErrors(t *testing.T) {
 	_, err := LoadConfig(filepath.Join(t.TempDir(), "does-not-exist.yml"))
 	assert.Error(t, err)

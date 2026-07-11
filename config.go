@@ -3,6 +3,7 @@ package awsapimcproxy
 import (
 	"fmt"
 	"os"
+	"slices"
 
 	"gopkg.in/yaml.v3"
 )
@@ -57,7 +58,8 @@ func LoadConfig(path string) (*Config, error) {
 
 func (config *Config) validate() error {
 	if len(config.Command) == 0 {
-		config.Command = DefaultCommand
+		// Clone so callers cannot mutate the shared DefaultCommand slice.
+		config.Command = slices.Clone(DefaultCommand)
 	}
 
 	if len(config.Profiles) == 0 {

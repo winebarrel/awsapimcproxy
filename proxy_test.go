@@ -3,6 +3,7 @@ package awsapimcproxy
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -44,7 +45,12 @@ func runFakeServer() {
 		},
 	)
 
-	_ = server.Run(context.Background(), &mcp.StdioTransport{})
+	// A normal client disconnect returns nil; a real serve failure is surfaced
+	// so it is not silently masked by a zero exit status.
+	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
+		fmt.Fprintln(os.Stderr, "fake server:", err)
+		os.Exit(1)
+	}
 }
 
 // fakeConfig builds a config whose upstream command re-execs this test binary

@@ -274,6 +274,11 @@ func TestWrapToolKeepsSessionOnContextCancel(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, res.IsError)
 
+	// The error reports the cancellation plainly, not as a generic failure.
+	msg := res.Content[0].(*mcp.TextContent).Text
+	assert.Contains(t, msg, "was cancelled")
+	assert.NotContains(t, msg, "failed to call")
+
 	// The cached session must be preserved, not dropped, on a cancelled request.
 	again, err := proxy.session(context.Background(), "dev")
 	require.NoError(t, err)

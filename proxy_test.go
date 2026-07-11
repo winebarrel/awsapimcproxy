@@ -293,6 +293,9 @@ func TestRunErrors(t *testing.T) {
 	assert.Error(t, NewProxy(nil, "test").Run(ctx))
 	assert.Error(t, NewProxy(&Config{}, "test").Run(ctx))
 
+	// An unvalidated config with a nil profile entry must fail, not panic.
+	assert.Error(t, NewProxy(&Config{Profiles: []*ProfileConfig{nil}}, "test").Run(ctx))
+
 	proxy := NewProxy(&Config{
 		Command:  []string{"/nonexistent/awsapimcproxy-test-binary"},
 		Profiles: []*ProfileConfig{{Name: "dev"}},

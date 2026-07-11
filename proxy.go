@@ -66,8 +66,15 @@ func (proxy *Proxy) Run(ctx context.Context) error {
 // proxy-native list_profiles tool) and returns a server ready to serve. It does
 // not start serving.
 func (proxy *Proxy) buildServer(ctx context.Context) (*mcp.Server, error) {
-	if proxy.config == nil || len(proxy.config.Profiles) == 0 {
+	if proxy.config == nil {
 		return nil, fmt.Errorf("no profiles are configured")
+	}
+
+	// Validate here too so a programmatically constructed config (one that did
+	// not go through LoadConfig) is rejected -- and DefaultCommand applied --
+	// before any profile entry is dereferenced.
+	if err := proxy.config.validate(); err != nil {
+		return nil, err
 	}
 
 	server := mcp.NewServer(&mcp.Implementation{

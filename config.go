@@ -67,6 +67,10 @@ func (config *Config) validate() error {
 	seen := map[string]bool{}
 
 	for i, profile := range config.Profiles {
+		if profile == nil {
+			return fmt.Errorf("profiles[%d]: is empty", i)
+		}
+
 		if profile.Name == "" {
 			return fmt.Errorf("profiles[%d]: 'name' is required", i)
 		}

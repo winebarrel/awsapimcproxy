@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -25,6 +26,11 @@ type Proxy struct {
 	config  *Config
 	version string
 
+	// baseCtx bounds the lifetime of the upstream subprocesses. It is the Run
+	// context, so subprocesses live until the proxy stops -- not until the tool
+	// call that first launched them returns.
+	baseCtx context.Context
+
 	mu       sync.Mutex
 	sessions map[string]*mcp.ClientSession
 }
@@ -41,8 +47,9 @@ func NewProxy(config *Config, version string) *Proxy {
 // Run builds the proxy server and serves it over stdio until the client
 // disconnects or ctx is cancelled.
 func (proxy *Proxy) Run(ctx context.Context) error {
-	// Close cached upstream sessions when the proxy stops (client disconnect or
-	// ctx cancellation) so their subprocesses are terminated promptly.
+	// Bind the upstream subprocesses to the proxy's lifetime, and close them when
+	// the proxy stops (client disconnect or ctx cancellation).
+	proxy.baseCtx = ctx
 	defer proxy.closeSessions()
 
 	server, err := proxy.buildServer(ctx)
@@ -130,7 +137,7 @@ func (proxy *Proxy) session(ctx context.Context, profile string) (*mcp.ClientSes
 		Version: proxy.version,
 	}, nil)
 
-	transport := &mcp.CommandTransport{Command: proxy.command(ctx, profileConfig)}
+	transport := &mcp.CommandTransport{Command: proxy.command(profileConfig)}
 
 	session, err := client.Connect(ctx, transport, nil)
 
@@ -155,26 +162,50 @@ func (proxy *Proxy) session(ctx context.Context, profile string) (*mcp.ClientSes
 
 // command builds the exec.Cmd that launches the upstream AWS API MCP server for
 // the profile, injecting the AWS profile and region into its environment.
-func (proxy *Proxy) command(ctx context.Context, profile *ProfileConfig) *exec.Cmd {
+//
+// The command is bound to proxy.baseCtx (the proxy's lifetime), not a per-call
+// context, so a cached subprocess survives the tool call that launched it.
+func (proxy *Proxy) command(profile *ProfileConfig) *exec.Cmd {
 	argv := proxy.config.Command
 
 	if len(argv) == 0 {
 		argv = DefaultCommand
 	}
 
+	ctx := proxy.baseCtx
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 
-	cmd.Env = os.Environ()
+	// Merge into a map first so our overrides win over any duplicate keys already
+	// present in the inherited environment (duplicate env entries are not
+	// well-defined across platforms).
+	env := map[string]string{}
+
+	for _, kv := range os.Environ() {
+		if i := strings.IndexByte(kv, '='); i >= 0 {
+			env[kv[:i]] = kv[i+1:]
+		}
+	}
 
 	if profile.AWSProfile != "" {
-		cmd.Env = append(cmd.Env, "AWS_API_MCP_PROFILE_NAME="+profile.AWSProfile)
+		env["AWS_API_MCP_PROFILE_NAME"] = profile.AWSProfile
 	}
 
 	if profile.Region != "" {
-		cmd.Env = append(cmd.Env, "AWS_REGION="+profile.Region)
+		env["AWS_REGION"] = profile.Region
 	}
 
 	for k, v := range profile.Env {
+		env[k] = v
+	}
+
+	cmd.Env = make([]string, 0, len(env))
+
+	for k, v := range env {
 		cmd.Env = append(cmd.Env, k+"="+v)
 	}
 

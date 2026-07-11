@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -87,9 +88,13 @@ func TestLive(t *testing.T) {
 }
 
 func TestCommand(t *testing.T) {
+	// A conflicting value in the inherited environment must be overridden, not
+	// duplicated.
+	t.Setenv("AWS_REGION", "inherited-region")
+
 	proxy := NewProxy(&Config{Command: []string{"my-cmd", "--flag"}}, "test")
 
-	cmd := proxy.command(context.Background(), &ProfileConfig{
+	cmd := proxy.command(&ProfileConfig{
 		Name:       "dev",
 		AWSProfile: "my-dev",
 		Region:     "us-east-1",
@@ -100,6 +105,36 @@ func TestCommand(t *testing.T) {
 	assert.Contains(t, cmd.Env, "AWS_API_MCP_PROFILE_NAME=my-dev")
 	assert.Contains(t, cmd.Env, "AWS_REGION=us-east-1")
 	assert.Contains(t, cmd.Env, "READ_OPERATIONS_ONLY=true")
+
+	// The override wins and is not duplicated.
+	assert.NotContains(t, cmd.Env, "AWS_REGION=inherited-region")
+
+	regions := 0
+	for _, kv := range cmd.Env {
+		if strings.HasPrefix(kv, "AWS_REGION=") {
+			regions++
+		}
+	}
+	assert.Equal(t, 1, regions, "AWS_REGION should appear exactly once")
+}
+
+func TestSessionSurvivesRequestContextCancel(t *testing.T) {
+	proxy := NewProxy(fakeConfig(
+		&ProfileConfig{Name: "dev", AWSProfile: "my-dev"},
+	), "test")
+	defer proxy.closeSessions()
+
+	// Launch the subprocess with a cancelable per-call context, then cancel it.
+	ctx, cancel := context.WithCancel(context.Background())
+
+	session, err := proxy.session(ctx, "dev")
+	require.NoError(t, err)
+
+	cancel()
+
+	// The cached subprocess must still be usable after the call's context ends.
+	_, err = session.ListTools(context.Background(), &mcp.ListToolsParams{})
+	assert.NoError(t, err)
 }
 
 func TestSession(t *testing.T) {

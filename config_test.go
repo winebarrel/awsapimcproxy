@@ -68,6 +68,7 @@ func TestLoadConfigErrors(t *testing.T) {
 	cases := map[string]string{
 		"no profiles":  `command: [x]`,
 		"missing name": "profiles:\n  - aws_profile: a\n",
+		"nil profile":  "profiles:\n  -\n",
 		"duplicate":    "profiles:\n  - name: dev\n  - name: dev\n",
 	}
 

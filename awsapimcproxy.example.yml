@@ -1,0 +1,21 @@
+# awsapimcproxy.yml
+
+# Optional. The command that launches an upstream AWS API MCP server.
+# Default: [uvx, awslabs.aws-api-mcp-server@latest]
+# command: [uvx, awslabs.aws-api-mcp-server@latest]
+
+# Values are expanded with os.ExpandEnv, so ${ENV_VAR} references work.
+#
+# Each profile launches its own upstream AWS API MCP server process:
+#   aws_profile -> AWS_API_MCP_PROFILE_NAME
+#   region      -> AWS_REGION
+profiles:
+  - name: dev
+    aws_profile: my-dev
+    region: us-east-1
+  - name: prod
+    aws_profile: my-prod
+    region: ap-northeast-1
+    # Optional extra environment for this profile's upstream process.
+    # env:
+    #   READ_OPERATIONS_ONLY: "true"

@@ -101,8 +101,13 @@ func (proxy *Proxy) wrapTool(tool *mcp.Tool, profileNames []string) (*mcp.Tool, 
 		})
 
 		if err != nil {
-			// The upstream session may be broken; drop it so the next call reconnects.
-			proxy.dropSession(profile)
+			// A cancelled or timed-out request does not mean the upstream is
+			// broken, so keep the cached session in that case. Otherwise assume the
+			// session may be broken and drop it so the next call reconnects.
+			if ctx.Err() == nil {
+				proxy.dropSession(profile)
+			}
+
 			return errorResult("failed to call '%s' for profile '%s': %s", toolName, profile, err), nil
 		}
 

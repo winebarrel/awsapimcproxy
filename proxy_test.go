@@ -248,6 +248,38 @@ func TestWrapTool(t *testing.T) {
 	assert.True(t, call(`{bad`).IsError, "expected an error for malformed arguments")
 }
 
+func TestWrapToolKeepsSessionOnContextCancel(t *testing.T) {
+	proxy := NewProxy(fakeConfig(
+		&ProfileConfig{Name: "dev", AWSProfile: "my-dev"},
+	), "test")
+	defer proxy.closeSessions()
+
+	// Pre-establish the session so the handler returns the cached one.
+	session, err := proxy.session(context.Background(), "dev")
+	require.NoError(t, err)
+
+	_, handler, err := proxy.wrapTool(
+		&mcp.Tool{Name: "whoami", InputSchema: map[string]any{"type": "object"}},
+		[]string{"dev"},
+	)
+	require.NoError(t, err)
+
+	// A cancelled request context makes the forwarded call fail.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	res, err := handler(ctx, &mcp.CallToolRequest{
+		Params: &mcp.CallToolParamsRaw{Arguments: json.RawMessage(`{"profile":"dev"}`)},
+	})
+	require.NoError(t, err)
+	assert.True(t, res.IsError)
+
+	// The cached session must be preserved, not dropped, on a cancelled request.
+	again, err := proxy.session(context.Background(), "dev")
+	require.NoError(t, err)
+	assert.Same(t, session, again, "session should not be dropped on a cancelled request")
+}
+
 func TestBuildServer(t *testing.T) {
 	proxy := NewProxy(fakeConfig(
 		&ProfileConfig{Name: "dev", AWSProfile: "my-dev"},

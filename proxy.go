@@ -67,7 +67,7 @@ func (proxy *Proxy) Run(ctx context.Context) error {
 // not start serving.
 func (proxy *Proxy) buildServer(ctx context.Context) (*mcp.Server, error) {
 	if proxy.config == nil {
-		return nil, fmt.Errorf("no profiles are configured")
+		return nil, fmt.Errorf("no config is set")
 	}
 
 	// Validate here too so a programmatically constructed config (one that did

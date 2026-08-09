@@ -4,6 +4,15 @@
 [![codecov](https://codecov.io/gh/winebarrel/awsapimcproxy/branch/main/graph/badge.svg)](https://codecov.io/gh/winebarrel/awsapimcproxy)
 [![AI Generated](https://img.shields.io/badge/AI%20Generated-Claude-orange?logo=anthropic)](https://claude.ai/claude-code)
 
+> [!IMPORTANT]
+> Use [awsmcproxy](https://github.com/winebarrel/awsmcproxy) instead.
+>
+> AWS now recommends the managed [AWS MCP Server](https://docs.aws.amazon.com/agent-toolkit/latest/userguide/getting-started-aws-mcp-server.html)
+> over the AWS API MCP Server this proxy wraps, and asks you to remove
+> `aws-api-mcp-server` from your MCP client config. `awsmcproxy` is the same
+> multi-profile proxy for that server -- and it needs no `uvx` and starts no
+> subprocesses.
+
 A multi-profile proxy for the [AWS API MCP Server](https://github.com/awslabs/mcp/tree/main/src/aws-api-mcp-server).
 
 The AWS API MCP server picks its AWS identity from the environment
